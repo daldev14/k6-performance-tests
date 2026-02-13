@@ -34,7 +34,18 @@ export default function () {
   check(res, {
     'status is 200': (r) => r.status === 200,
     'response time < 500ms': (r) => r.timings.duration < 500,
-    'response has data': (r) => r.json().length > 0,
+    'response has data': (r) => {
+      const ct = (r.headers['Content-Type'] || r.headers['content-type'] || '');
+      if (!ct.includes('application/json')) return false;
+      try {
+        const body = r.json();
+        if (Array.isArray(body)) return body.length > 0;
+        if (body && typeof body === 'object') return Object.keys(body).length > 0;
+        return !!body;
+      } catch (e) {
+        return false;
+      }
+    },
   });
 
   // Pausa de 1 segundo entre cada iteración para simular un comportamiento más realista
