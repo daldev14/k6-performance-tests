@@ -40,17 +40,18 @@ function Print-Separator {
 
 Print-Header
 
-# Busca archivos .js en el directorio de tests y los muestra numerados para selección
+# Busca archivos .test.js en el directorio de tests y los muestra numerados para selección
 Write-ColorText "Pruebas disponibles:" "Yellow"
 Print-Separator
 
 $tests = @()
 $i = 1
-Get-ChildItem -Path $TestsDir -Filter "*.js" | ForEach-Object {
+Get-ChildItem -Path $TestsDir -Filter "*.test.js" -Recurse | Sort-Object FullName | ForEach-Object {
+    $relativePath = $_.FullName -replace [regex]::Escape($TestsDir), "" | ($_ -replace "^\\" , "")
     $tests += $_.FullName
     Write-Host "  [" -NoNewline
     Write-Host $i -ForegroundColor Green -NoNewline
-    Write-Host "] $($_.Name)"
+    Write-Host "] $relativePath"
     $i++
 }
 
@@ -62,28 +63,53 @@ if ($tests.Count -eq 0) {
 Print-Separator
 
 # Solicita selección del test a ejecutar y valida la entrada
-Write-Host "Selecciona el número del test a ejecutar: " -ForegroundColor Yellow -NoNewline
+Write-Host "Selecciona el número del test o ingresa la ruta relativa del script: " -ForegroundColor Yellow -NoNewline
 $testSelection = Read-Host
 
-$testIndex = 0
-if ([int]::TryParse($testSelection, [ref]$testIndex)) {
+$selectedTest = $null
+
+# Verifica si es una ruta de archivo
+if ($testSelection -match "\.js$") {
+    if (Test-Path $testSelection) {
+        $selectedTest = (Resolve-Path $testSelection).Path
+    } else {
+        Write-ColorText "Archivo no encontrado: $testSelection" "Red"
+        exit 1
+    }
+}
+# Verifica si es un número válido
+elseif ($testSelection -match "^\d+$") {
+    $testIndex = [int]$testSelection
     if ($testIndex -lt 1 -or $testIndex -gt $tests.Count) {
         Write-ColorText "Selección inválida" "Red"
         exit 1
     }
-} else {
-    Write-ColorText "Selección inválida" "Red"
+    $selectedTest = $tests[$testIndex - 1]
+}
+else {
+    Write-ColorText "Selección inválida. Ingresa un número o ruta relativa del script" "Red"
     exit 1
 }
 
-$selectedTest = $tests[$testIndex - 1]
 $testName = [System.IO.Path]::GetFileNameWithoutExtension($selectedTest)
+$relativeTestPath = ($selectedTest -replace [regex]::Escape($TestsDir), "") -replace "^\\" , ""
+$testSubdir = Split-Path -Parent $relativeTestPath
 
 Write-ColorText "✓ Test seleccionado: $testName" "Green"
 Print-Separator
 
+# Crea la estructura de carpetas en reports si el test está en subcarpetas
+if ($testSubdir -and $testSubdir -ne ".") {
+    $reportSubdir = Join-Path $ReportsDir $testSubdir
+    if (!(Test-Path $reportSubdir)) {
+        New-Item -ItemType Directory -Path $reportSubdir | Out-Null
+    }
+} else {
+    $reportSubdir = $ReportsDir
+}
+
 # Genera un nombre de reporte por defecto basado en el nombre del test y la fecha/hora actual
-$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$timestamp = Get-Date -Format "ddMMyyyy_HHmmss"
 $defaultReport = "${testName}_${timestamp}"
 
 Write-Host "Nombre del reporte [" -ForegroundColor Yellow -NoNewline
@@ -100,7 +126,7 @@ if (-not $reportName.EndsWith(".html")) {
     $reportName = "${reportName}.html"
 }
 
-Write-ColorText "✓ Reporte: $ReportsDir\$reportName" "Green"
+Write-ColorText "✓ Reporte: $(Join-Path $reportSubdir $reportName)" "Green"
 Print-Separator
 
 # Solicita al usuario configurar variables de entorno para la ejecución del test, con valores por defecto sugeridos
@@ -145,7 +171,7 @@ Print-Separator
 # Establece las variables de entorno para ejecutar el test con k6
 $env:K6_WEB_DASHBOARD = $webDashboard
 $env:K6_WEB_DASHBOARD_OPEN = $webDashboardOpen
-$env:K6_WEB_DASHBOARD_EXPORT = "$ReportsDir\$reportName"
+$env:K6_WEB_DASHBOARD_EXPORT = "$(Join-Path $reportSubdir $reportName)"
 $env:BASE_URL = $baseUrl
 
 # Construye el comando agregando las opciones definidas
@@ -166,7 +192,7 @@ $cmdArgs += $selectedTest
 # Muestra un resumen de la configuración antes de ejecutar el test y solicita confirmación al usuario
 Write-ColorText "Resumen de ejecución:" "Yellow"
 Write-Host "  Test:        " -NoNewline; Write-ColorText $selectedTest "Green"
-Write-Host "  Reporte:     " -NoNewline; Write-ColorText "$ReportsDir\$reportName" "Green"
+Write-Host "  Reporte:     " -NoNewline; Write-ColorText "$(Join-Path $reportSubdir $reportName)" "Green"
 Write-Host "  BASE_URL:    " -NoNewline; Write-ColorText $baseUrl "Green"
 Write-Host "  Dashboard:   " -NoNewline; Write-ColorText $webDashboard "Green"
 Write-Host "  Auto-open:   " -NoNewline; Write-ColorText $webDashboardOpen "Green"
@@ -203,7 +229,7 @@ Print-Separator
 
 if ($exitCode -eq 0) {
     Write-ColorText "✓ Test completado exitosamente" "Green"
-    Write-ColorText "✓ Reporte guardado en: $ReportsDir\$reportName" "Green"
+    Write-ColorText "✓ Reporte guardado en: $(Join-Path $reportSubdir $reportName)" "Green"
 } else {
     Write-ColorText "✗ Test finalizado con errores (código: $exitCode)" "Red"
 }

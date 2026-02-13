@@ -40,20 +40,18 @@ print_separator() {
 
 print_header
 
-# Busca archivos .js en el directorio de tests y los muestra numerados para selección
+# Busca archivos .test.js en el directorio de tests y los muestra numerados para selección
 echo -e "${YELLOW}Pruebas disponibles:${NC}"
 print_separator
 
 tests=()
 i=1
-for file in "$TEST_DIR"/*.js; do
-    if [ -f "$file" ]; then
-        filename=$(basename "$file")
-        tests+=("$file")
-        echo -e "  ${GREEN}[$i]${NC} $filename"
-        ((i++))
-    fi
-done
+while IFS= read -r file; do
+    relative_path="${file#$TEST_DIR/}"
+    tests+=("$file")
+    echo -e "  ${GREEN}[$i]${NC} $relative_path"
+    ((i++))
+done < <(find "$TEST_DIR" -name "*.test.js" -type f | sort)
 
 if [ ${#tests[@]} -eq 0 ]; then
     echo -e "${RED}No se encontraron tests en $TEST_DIR${NC}"
@@ -62,23 +60,43 @@ fi
 
 print_separator
 
-# Solicita selección del test a ejecutar y valida la entrada
-echo -e -n "${YELLOW}Selecciona el número del test a ejecutar:${NC} "
+# Solicita selección del test a ejecutar o ruta relativa
+echo -e -n "${YELLOW}Selecciona el número del test o ingresa la ruta relativa del script:${NC} "
 read -r test_selection
 
-if ! [[ "$test_selection" =~ ^[0-9]+$ ]] || [ "$test_selection" -lt 1 ] || [ "$test_selection" -gt ${#tests[@]} ]; then
-    echo -e "${RED}Selección inválida${NC}"
+# Verifica si es una ruta de archivo
+if [[ "$test_selection" == *.js ]]; then
+    if [ -f "$test_selection" ]; then
+        selected_test="$test_selection"
+    else
+        echo -e "${RED}Archivo no encontrado: $test_selection${NC}"
+        exit 1
+    fi
+# Verifica si es un número válido
+elif [[ "$test_selection" =~ ^[0-9]+$ ]] && [ "$test_selection" -ge 1 ] && [ "$test_selection" -le ${#tests[@]} ]; then
+    selected_test="${tests[$((test_selection-1))]}"
+else
+    echo -e "${RED}Selección inválida. Ingresa un número o ruta relativa del script${NC}"
     exit 1
 fi
 
-selected_test="${tests[$((test_selection-1))]}"
 test_name=$(basename "$selected_test" .js)
+relative_test_path="${selected_test#$TEST_DIR/}"
+test_subdir=$(dirname "$relative_test_path")
 
 echo -e "${GREEN}✓ Test seleccionado: $test_name${NC}"
 print_separator
 
+# Crea la estructura de carpetas en reports si el test está en subcarpetas
+if [ "$test_subdir" != "." ]; then
+    report_subdir="$REPORTS_DIR/$test_subdir"
+    mkdir -p "$report_subdir"
+else
+    report_subdir="$REPORTS_DIR"
+fi
+
 # Genera un nombre de reporte por defecto basado en el nombre del test y la fecha/hora actual
-default_report="${test_name}_$(date '+%Y%m%d_%H%M%S')"
+default_report="${test_name}_$(date '+%d%m%Y_%H%M%S')"
 echo -e -n "${YELLOW}Nombre del reporte [${NC}${default_report}${YELLOW}]:${NC} "
 read -r report_name
 
@@ -91,7 +109,7 @@ if [[ "$report_name" != *.html ]]; then
     report_name="${report_name}.html"
 fi
 
-echo -e "${GREEN}✓ Reporte: $REPORTS_DIR/$report_name${NC}"
+echo -e "${GREEN}✓ Reporte: $report_subdir/$report_name${NC}"
 print_separator
 
 # Solicita al usuario configurar variables de entorno para la ejecución del test, con valores por defecto sugeridos
@@ -109,16 +127,15 @@ read -r web_dashboard_open
 web_dashboard_open=${web_dashboard_open:-true}
 
 # BASE_URL (opcional) sobrescribe la URL base definida en el test, solo si se proporciona un valor
-echo -e -n "  BASE_URL [${GREEN}https://test-api.k6.io${NC}]: "
+echo -e -n "  BASE_URL (opcional) [${GREEN}-${NC}]: "
 read -r base_url
-base_url=${base_url:-https://test-api.k6.io}
 
 # VUs (Opcional) sobrescribe el número de usuario virtuales definido en el test, solo si se proporciona un valor
-echo -e -n "  VUs (virtual users, vacío para usar config del test) [${GREEN}-${NC}]: "
+echo -e -n "  VUs (virtual users, opcional) [${GREEN}-${NC}]: "
 read -r vus
 
 # Duration (opcional) sobrescribe la duración del test definido en el test, solo si se proporciona un valor
-echo -e -n "  DURATION (ej: 30s, 1m, vacío para usar config del test) [${GREEN}-${NC}]: "
+echo -e -n "  DURATION (ej: 30s, 1m, opcional) [${GREEN}-${NC}]: "
 read -r duration
 
 print_separator
@@ -126,11 +143,11 @@ print_separator
 # Establece las variables de entorno para ejecutar el test con k6
 export K6_WEB_DASHBOARD="$web_dashboard"
 export K6_WEB_DASHBOARD_OPEN="$web_dashboard_open"
-export K6_WEB_DASHBOARD_EXPORT="$REPORTS_DIR/$report_name"
+export K6_WEB_DASHBOARD_EXPORT="$report_subdir/$report_name"
 export BASE_URL="$base_url"
 
 # Construye el comando agregando las opciones definidas
-cmd="k6 run"
+cmd="k6 run -l"
 
 if [ -n "$vus" ]; then
     cmd="$cmd --vus $vus"
@@ -145,7 +162,7 @@ cmd="$cmd $selected_test"
 # Muestra un resumen de la configuración antes de ejecutar el test y solicita confirmación al usuario
 echo -e "${YELLOW}Resumen de ejecución:${NC}"
 echo -e "  Test:        ${GREEN}$selected_test${NC}"
-echo -e "  Reporte:     ${GREEN}$REPORTS_DIR/$report_name${NC}"
+echo -e "  Reporte:     ${GREEN}$report_subdir/$report_name${NC}"
 echo -e "  BASE_URL:    ${GREEN}$base_url${NC}"
 echo -e "  Dashboard:   ${GREEN}$web_dashboard${NC}"
 echo -e "  Auto-open:   ${GREEN}$web_dashboard_open${NC}"
@@ -153,8 +170,9 @@ echo -e "  Auto-open:   ${GREEN}$web_dashboard_open${NC}"
 [ -n "$duration" ] && echo -e "  Duration:    ${GREEN}$duration${NC}"
 print_separator
 
-echo -e -n "${YELLOW}¿Ejecutar test? (s/N):${NC} "
+echo -e -n "${YELLOW}¿Ejecutar test? (s/N) [${GREEN}s${NC}${YELLOW}]:${NC} "
 read -r confirm
+confirm=${confirm:-s}
 
 if [[ ! "$confirm" =~ ^[sS]$ ]]; then
     echo -e "${RED}Ejecución cancelada${NC}"
@@ -175,7 +193,7 @@ echo ""
 print_separator
 if [ $exit_code -eq 0 ]; then
     echo -e "${GREEN}✓ Test completado exitosamente${NC}"
-    echo -e "${GREEN}✓ Reporte guardado en: $REPORTS_DIR/$report_name${NC}"
+    echo -e "${GREEN}✓ Reporte guardado en: $report_subdir/$report_name${NC}"
 else
     echo -e "${RED}✗ Test finalizado con errores (código: $exit_code)${NC}"
 fi
