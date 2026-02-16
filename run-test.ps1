@@ -137,10 +137,11 @@ $env:K6_WEB_DASHBOARD_EXPORT = Join-Path $report_subdir $report_name
 if ($base_url) { $env:BASE_URL = $base_url } else { Remove-Item Env:BASE_URL -ErrorAction SilentlyContinue }
 
 # Construye el comando agregando las opciones definidas
-$args = @('run','-l')
+$args = @('run')
+if (-not [string]::IsNullOrWhiteSpace($linger)) { $args += '-l'; $args += $linger }
 if (-not [string]::IsNullOrWhiteSpace($vus)) { $args += '--vus'; $args += $vus }
 if (-not [string]::IsNullOrWhiteSpace($duration)) { $args += '--duration'; $args += $duration }
-$args += $selected_test
+$args += $relative_test_path
 
 # Muestra un resumen de la configuración antes de ejecutar el test y solicita confirmación al usuario
 Write-Host 'Resumen de ejecucion:' -ForegroundColor Yellow
