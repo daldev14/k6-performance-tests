@@ -41,7 +41,8 @@ print_separator() {
 
 print_header
 
-# Busca archivos .test.js en el directorio de tests y los muestra numerados para selección
+# -------------------- BUSCAR ARCHIVOS --------------------
+
 echo -e "${YELLOW}Pruebas disponibles:${NC}"
 print_separator
 
@@ -61,19 +62,21 @@ fi
 
 print_separator
 
-# Solicita selección del test a ejecutar o ruta relativa
+# -------------------- SELECCIONAR TEST A EJECUTAR --------------------
+
 echo -e -n "${YELLOW}Selecciona el número del test o ingresa la ruta relativa del script:${NC} "
 read -r test_selection
 
-# Verifica si es una ruta de archivo
-if [[ "$test_selection" == *.js ]]; then
+# Verifica si el valor ingresado es la ruta relativa del archivo
+if [[ "$test_selection" == $TEST_EXTENSION ]]; then
     if [ -f "$test_selection" ]; then
         selected_test="$test_selection"
     else
         echo -e "${RED}Archivo no encontrado: $test_selection${NC}"
         exit 1
     fi
-# Verifica si es un número válido
+
+# Verifica si el valor ingresado en un número
 elif [[ "$test_selection" =~ ^[0-9]+$ ]] && [ "$test_selection" -ge 1 ] && [ "$test_selection" -le ${#tests[@]} ]; then
     selected_test="${tests[$((test_selection-1))]}"
 else
@@ -81,14 +84,23 @@ else
     exit 1
 fi
 
-test_name=$(basename "$selected_test" .js)
 relative_test_path="${selected_test#$TEST_DIR/}"
 test_subdir=$(dirname "$relative_test_path")
+filename=$(basename "$selected_test")
+# Quitar solo la extensión .js para conservar ".test" en el nombre del reporte
+if [ "$test_subdir" = "." ]; then
+    test_name="${filename%.js}"
+else
+    # Para tests en subcarpetas, también quitar únicamente la extensión .js
+    test_name="${filename%.js}"
+fi
 
 echo -e "${GREEN}✓ Test seleccionado: $test_name${NC}"
 print_separator
 
-# Crea la estructura de carpetas en reports si el test está en subcarpetas
+# -------------------- CREA LA CARPETA DONDE SE GUARDA EL REPORTE --------------------
+# Crea la misma carpeta donde esta el test en k6-tests pero en reports
+
 if [ "$test_subdir" != "." ]; then
     report_subdir="$REPORTS_DIR/$test_subdir"
     mkdir -p "$report_subdir"
@@ -96,7 +108,9 @@ else
     report_subdir="$REPORTS_DIR"
 fi
 
-# Genera un nombre de reporte por defecto basado en el nombre del test y la fecha/hora actual
+# -------------------- CREA EL NOMBRE DEL REPORTE --------------------
+# Por defecto se crea basado en el nombre del test y la fecha/hora actual
+
 default_report="${test_name}_$(date '+%d%m%Y_%H%M%S')"
 echo -e -n "${YELLOW}Nombre del reporte [${NC}${default_report}${YELLOW}]:${NC} "
 read -r report_name
@@ -113,34 +127,31 @@ fi
 echo -e "${GREEN}✓ Reporte: $report_subdir/$report_name${NC}"
 print_separator
 
+# -------------------- CONFIGURACIÓN DE VARIABLES DE ENTORNO - K6 --------------------
+
 # Solicita al usuario configurar variables de entorno para la ejecución del test, con valores por defecto sugeridos
 echo -e "${YELLOW}Variables de entorno (presiona Enter para usar valores por defecto):${NC}"
 echo ""
 
-# K6_WEB_DASHBOARD (activa el dashboard web para visualizar el progreso del test en tiempo real)
-echo -e -n "  K6_WEB_DASHBOARD [${GREEN}true${NC}]: "
-read -r web_dashboard
+# 1. K6_WEB_DASHBOARD (activa el dashboard web para visualizar el progreso del test en tiempo real)
+# echo -e -n "  K6_WEB_DASHBOARD [${GREEN}true${NC}]: "
+# read -r web_dashboard
 web_dashboard=${web_dashboard:-true}
 
-# K6_WEB_DASHBOARD_OPEN (define si el dashboard se abre automáticamente en el navegador al iniciar el test)
-echo -e -n "  K6_WEB_DASHBOARD_OPEN [${GREEN}$web_dashboard${NC}]: "
-read -r web_dashboard_open
+# 2. K6_WEB_DASHBOARD_OPEN (define si el dashboard se abre automáticamente en el navegador al iniciar el test)
+# echo -e -n "  K6_WEB_DASHBOARD_OPEN [${GREEN}true${NC}]: "
+# read -r web_dashboard_open
 web_dashboard_open=${web_dashboard_open:-$web_dashboard}
 
-# Linger - Permite seguir ejecutando el proceso de la prueba una vez finalizada, útil si se quiere seguir utilizando K6_WEB_DASHBOARD
-echo -e -n "  LINGER - PERSISTIR (Seguir ejecutando el proceso despues de finalizar la prueba) [${GREEN}$web_dashboard${NC}]: "
-read -r linger
-linger=${linger:-$web_dashboard}
-
-# BASE_URL (opcional) sobrescribe la URL base definida en el test, solo si se proporciona un valor
+# 3. BASE_URL (opcional) sobrescribe la URL base definida en el test, solo si se proporciona un valor
 echo -e -n "  BASE_URL (opcional) [${GREEN}-${NC}]: "
 read -r base_url
 
-# VUs (Opcional) sobrescribe el número de usuario virtuales definido en el test, solo si se proporciona un valor
+# 4. VUs (Opcional) sobrescribe el número de usuario virtuales definido en el test, solo si se proporciona un valor
 echo -e -n "  VUs (virtual users, opcional) [${GREEN}-${NC}]: "
 read -r vus
 
-# Duration (opcional) sobrescribe la duración del test definido en el test, solo si se proporciona un valor
+# 5. Duration (opcional) sobrescribe la duración del test definido en el test, solo si se proporciona un valor
 echo -e -n "  DURATION (ej: 30s, 1m, opcional) [${GREEN}-${NC}]: "
 read -r duration
 
@@ -152,12 +163,9 @@ export K6_WEB_DASHBOARD_OPEN="$web_dashboard_open"
 export K6_WEB_DASHBOARD_EXPORT="$report_subdir/$report_name"
 export BASE_URL="$base_url"
 
-# Construye el comando agregando las opciones definidas
-cmd="k6 run"
+# -------------------- CONSTRUCCIÓN DEL COMANDO --------------------
 
-if [ -n "$linger" ]; then
-    cmd="$cmd -l"
-fi
+cmd="k6 run"
 
 if [ -n "$vus" ]; then
     cmd="$cmd --vus $vus"
@@ -169,17 +177,19 @@ fi
 
 cmd="$cmd $selected_test"
 
-# Muestra un resumen de la configuración antes de ejecutar el test y solicita confirmación al usuario
+# Muestra un resumen de la configuración
 echo -e "${YELLOW}Resumen de ejecución:${NC}"
 echo -e "  Test:        ${GREEN}$selected_test${NC}"
 echo -e "  Reporte:     ${GREEN}$report_subdir/$report_name${NC}"
 echo -e "  BASE_URL:    ${GREEN}$base_url${NC}"
 echo -e "  Dashboard:   ${GREEN}$web_dashboard${NC}"
 echo -e "  Auto-open:   ${GREEN}$web_dashboard_open${NC}"
-echo -e "  Linger:      ${GREEN}$linger${NC}"
 [ -n "$vus" ] && echo -e "  VUs:         ${GREEN}$vus${NC}"
 [ -n "$duration" ] && echo -e "  Duration:    ${GREEN}$duration${NC}"
+
 print_separator
+
+# -------------------- EJECUCIÓN DEL TEST --------------------
 
 echo -e -n "${YELLOW}¿Ejecutar test? (s/N) [${GREEN}s${NC}${YELLOW}]:${NC} "
 read -r confirm
@@ -190,12 +200,12 @@ if [[ ! "$confirm" =~ ^[sS]$ ]]; then
     exit 0
 fi
 
-# Ejecuta el comando construido
 echo ""
 echo -e "${GREEN}Ejecutando: $cmd${NC}"
 print_separator
 echo ""
 
+# Ejecuta el comando construido
 eval "$cmd"
 
 exit_code=$?

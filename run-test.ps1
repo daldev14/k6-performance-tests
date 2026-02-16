@@ -1,180 +1,241 @@
 # =============================================================================
-# k6 Test Runner Script for PowerShell
+# k6 Test Runner Script for Windows PowerShell
 # =============================================================================
 
-param()
+$TEST_DIR = "./k6-tests"
+$REPORTS_DIR = "./reports"
+$TEST_EXTENSION = "*.test.js"
 
-$TEST_DIR = 'k6-tests'
-$REPORTS_DIR = 'reports'
-$TEST_EXTENSION="*.test.js"
+# Crea el directorio reports si no existe
+if (-not (Test-Path -Path $REPORTS_DIR)) {
+    New-Item -ItemType Directory -Path $REPORTS_DIR | Out-Null
+}
 
 # -----------------------------------------------------------------------------
 # Functions
 # -----------------------------------------------------------------------------
 
 function Print-Header {
-    Write-Host "╔═══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║                       k6 Test Runner                          ║" -ForegroundColor Cyan
-    Write-Host "╚═══════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "╔═══════════════════════════════════════════════════════════════╗" -ForegroundColor Blue
+    Write-Host "║                       k6 Test Runner                          ║" -ForegroundColor Blue
+    Write-Host "╚═══════════════════════════════════════════════════════════════╝" -ForegroundColor Blue
     Write-Host ""
 }
 
 function Print-Separator {
-    Write-Host '------------------------------------------------' -ForegroundColor Cyan
+    Write-Host "───────────────────────────────────────────────────────────────────" -ForegroundColor Blue
 }
 
 # -----------------------------------------------------------------------------
 # Main Script
 # -----------------------------------------------------------------------------
 
-# Crea el directorio reports si no existe
-if (-not (Test-Path -Path $REPORTS_DIR)) {
-    New-Item -ItemType Directory -Path $REPORTS_DIR -Force | Out-Null
-}
-
 Print-Header
 
-Write-Host 'Pruebas disponibles:' -ForegroundColor Yellow
+# -------------------- BUSCAR ARCHIVOS --------------------
+
+Write-Host "Pruebas disponibles:" -ForegroundColor Yellow
 Print-Separator
 
-try {
-    $baseFull = (Get-Item $TEST_DIR -ErrorAction Stop).FullName
-} catch {
-    Write-Host "Directorio de tests no encontrado: $TEST_DIR" -ForegroundColor Red
-    exit 1
-}
+$tests = Get-ChildItem -Path $TEST_DIR -Filter $TEST_EXTENSION -Recurse -File | Sort-Object FullName
+$testArray = @()
 
-$tests = Get-ChildItem -Path $TEST_DIR -Recurse -Filter $TEST_EXTENSION -File
 if ($tests.Count -eq 0) {
     Write-Host "No se encontraron tests en $TEST_DIR" -ForegroundColor Red
     exit 1
 }
 
 $i = 1
-$testsFull = @()
-foreach ($file in $tests) {
-    $rel = $file.FullName.Substring($baseFull.Length + 1)
-    $testsFull += $file.FullName
-    Write-Host "  [$i] $rel" -ForegroundColor Green
+foreach ($test in $tests) {
+    $relativePath = $test.FullName.Replace((Resolve-Path $TEST_DIR).Path + "\", "")
+    $testArray += $test.FullName
+    Write-Host "  [$i] $relativePath" -ForegroundColor Green -NoNewline
+    Write-Host ""
     $i++
 }
 
 Print-Separator
 
-# Solicita selección del test a ejecutar o ruta relativa
-$selection = Read-Host -Prompt 'Selecciona el numero del test o ingresa la ruta relativa del script'
+# -------------------- SELECCIONAR TEST A EJECUTAR --------------------
+
+Write-Host "Selecciona el número del test o ingresa la ruta relativa del script: " -ForegroundColor Yellow -NoNewline
+$testSelection = Read-Host
+
+$selectedTest = $null
 
 # Verifica si es una ruta de archivo
-if ($selection -and $selection.ToLower().EndsWith('.js')) {
-    if (-not [System.IO.Path]::IsPathRooted($selection)) { $candidate = Join-Path $TEST_DIR $selection } else { $candidate = $selection }
-    
-    if (Test-Path -Path $candidate) { $selected_test = (Get-Item $candidate).FullName } else { Write-Host "Archivo no encontrado: $selection" -ForegroundColor Red; exit 1 }
+if ($testSelection -like "*.js") {
+    if (Test-Path -Path $testSelection) {
+        $selectedTest = (Resolve-Path $testSelection).Path
+    } else {
+        Write-Host "Archivo no encontrado: $testSelection" -ForegroundColor Red
+        exit 1
+    }
 }
 # Verifica si es un número válido
-elseif ($selection -match '^[0-9]+$') {
-    $idx = [int]$selection
-    if ($idx -ge 1 -and $idx -le $testsFull.Count) { $selected_test = $testsFull[$idx - 1] } else { Write-Host 'Seleccion invalida' -ForegroundColor Red; exit 1 }
+elseif ($testSelection -match '^\d+$' -and [int]$testSelection -ge 1 -and [int]$testSelection -le $testArray.Count) {
+    $selectedTest = $testArray[[int]$testSelection - 1]
 }
-else { Write-Host 'Seleccion invalida' -ForegroundColor Red; exit 1 }
+else {
+    Write-Host "Selección inválida. Ingresa un número o ruta relativa del script" -ForegroundColor Red
+    exit 1
+}
 
-$test_name = [System.IO.Path]::GetFileNameWithoutExtension($selected_test)
-if ($selected_test.StartsWith($baseFull)) { $relative_test_path = $selected_test.Substring($baseFull.Length + 1) } else { $relative_test_path = [System.IO.Path]::GetFileName($selected_test) }
+$testName = [System.IO.Path]::GetFileNameWithoutExtension($selectedTest)
+$relativeTestPath = $selectedTest.Replace((Resolve-Path $TEST_DIR).Path + "\", "")
+$testSubdir = [System.IO.Path]::GetDirectoryName($relativeTestPath)
 
-$test_subdir = [System.IO.Path]::GetDirectoryName($relative_test_path)
-if (-not $test_subdir) { $test_subdir = '.' }
-
-Write-Host "Test seleccionado: $test_name" -ForegroundColor Green
+Write-Host "✓ Test seleccionado: $testName" -ForegroundColor Green
 Print-Separator
 
-# Crea la estructura de carpetas en reports si el test está en subcarpetas
-if ($test_subdir -ne '.') {
-    $report_subdir = Join-Path $REPORTS_DIR $test_subdir
-    if (-not (Test-Path -Path $report_subdir)) { New-Item -ItemType Directory -Path $report_subdir -Force | Out-Null }
-} else { $report_subdir = $REPORTS_DIR }
+# -------------------- CREA LA CARPETA DONDE SE GUARDA EL REPORTE --------------------
+# Crea la misma carpeta donde esta el test en k6-tests pero en reports
 
-# Genera un nombre de reporte por defecto basado en el nombre del test y la fecha/hora actual
-$default_report = "${test_name}_$(Get-Date -Format 'ddMMyyyy_HHmmss')"
-$report_name = Read-Host -Prompt "Nombre del reporte [$default_report]"
+if ([string]::IsNullOrEmpty($testSubdir) -or $testSubdir -eq ".") {
+    $reportSubdir = $REPORTS_DIR
+} else {
+    $reportSubdir = Join-Path $REPORTS_DIR $testSubdir
+    if (-not (Test-Path -Path $reportSubdir)) {
+        New-Item -ItemType Directory -Path $reportSubdir | Out-Null
+    }
+}
 
-if ([string]::IsNullOrWhiteSpace($report_name)) { $report_name = $default_report }
+# -------------------- CREA EL NOMBRE DEL REPORTE --------------------
+# Por defecto se crea basado en el nombre del test y la fecha/hora actual
+
+$defaultReport = "${testName}_$(Get-Date -Format 'ddMMyyyy_HHmmss')"
+Write-Host "Nombre del reporte [" -ForegroundColor Yellow -NoNewline
+Write-Host "$defaultReport" -NoNewline
+Write-Host "]: " -ForegroundColor Yellow -NoNewline
+$reportName = Read-Host
+
+if ([string]::IsNullOrEmpty($reportName)) {
+    $reportName = $defaultReport
+}
 
 # Si el nombre del reporte no termina con .html, se le agrega la extensión
-if (-not $report_name.ToLower().EndsWith('.html')) { $report_name = "$report_name.html" }
-
-Write-Host "Reporte: $report_subdir/$report_name" -ForegroundColor Green
-Print-Separator
-
-# Solicita al usuario configurar variables de entorno para la ejecución del test, con valores por defecto sugeridos
-Write-Host 'Variables de entorno (presiona Enter para usar valores por defecto):' -ForegroundColor Yellow
-
-# K6_WEB_DASHBOARD (activa el dashboard web para visualizar el progreso del test en tiempo real)
-$web_dashboard = Read-Host -Prompt '  K6_WEB_DASHBOARD [true]'
-if ([string]::IsNullOrWhiteSpace($web_dashboard)) { $web_dashboard = 'true' }
-
-# K6_WEB_DASHBOARD_OPEN (define si el dashboard se abre automáticamente en el navegador al iniciar el test)
-$web_dashboard_open = Read-Host -Prompt "  K6_WEB_DASHBOARD_OPEN [$web_dashboard]"
-if ([string]::IsNullOrWhiteSpace($web_dashboard_open)) { $web_dashboard_open = $web_dashboard }
-
-# Linger - Permite seguir ejecutando el proceso de la prueba una vez finalizada, útil si se quiere seguir utilizando K6_WEB_DASHBOARD
-$linger = Read-Host -Prompt "  LINGER [$web_dashboard]"
-if ([string]::IsNullOrWhiteSpace($linger)) { $linger = $web_dashboard }
-
-<#
-  BASE_URL (opcional) sobrescribe la URL base definida en el test, solo si se proporciona un valor
-  VUs (Opcional) sobrescribe el número de usuario virtuales definido en el test, solo si se proporciona un valor
-  Duration (opcional) sobrescribe la duración del test definido en el test, solo si se proporciona un valor
-#>
-$base_url = Read-Host -Prompt '  BASE_URL (opcional) [-]'
-$vus = Read-Host -Prompt '  VUs (virtual users, opcional) [-]'
-$duration = Read-Host -Prompt '  DURATION (ej: 30s, 1m, opcional) [-]'
-
-Print-Separator
-
-# Establece las variables de entorno para ejecutar el test con k6
-$env:K6_WEB_DASHBOARD = $web_dashboard
-$env:K6_WEB_DASHBOARD_OPEN = $web_dashboard_open
-$env:K6_WEB_DASHBOARD_EXPORT = Join-Path $report_subdir $report_name
-if ($base_url) { $env:BASE_URL = $base_url } else { Remove-Item Env:BASE_URL -ErrorAction SilentlyContinue }
-
-# Construye el comando agregando las opciones definidas
-$args = @('run')
-if (-not [string]::IsNullOrWhiteSpace($linger)) { $args += '-l'; $args += $linger }
-if (-not [string]::IsNullOrWhiteSpace($vus)) { $args += '--vus'; $args += $vus }
-if (-not [string]::IsNullOrWhiteSpace($duration)) { $args += '--duration'; $args += $duration }
-$args += $relative_test_path
-
-# Muestra un resumen de la configuración antes de ejecutar el test y solicita confirmación al usuario
-Write-Host 'Resumen de ejecucion:' -ForegroundColor Yellow
-Write-Host "  Test:        $selected_test" -ForegroundColor Green
-Write-Host "  Reporte:     $report_subdir/$report_name" -ForegroundColor Green
-Write-Host "  BASE_URL:    $base_url" -ForegroundColor Green
-Write-Host "  Dashboard:   $web_dashboard" -ForegroundColor Green
-Write-Host "  Auto-open:   $web_dashboard_open" -ForegroundColor Green
-Write-Host "  Linger:      $linger" -ForegroundColor Green
-if (-not [string]::IsNullOrWhiteSpace($vus)) { Write-Host "  VUs:         $vus" -ForegroundColor Green }
-if (-not [string]::IsNullOrWhiteSpace($duration)) { Write-Host "  Duration:    $duration" -ForegroundColor Green }
-Print-Separator
-
-$confirm = Read-Host -Prompt 'Ejecutar test? (s/N) [s]'
-if ([string]::IsNullOrWhiteSpace($confirm)) { $confirm = 's' }
-if ($confirm -notmatch '^[sS]') { Write-Host 'Ejecucion cancelada' -ForegroundColor Red; exit 0 }
-
-# Ejecuta el comando construido
-Write-Host "" 
-Write-Host "Ejecutando: k6 $($args -join ' ')" -ForegroundColor Green
-Print-Separator
-Write-Host ""
-
-& k6 @args
-$exit_code = $LASTEXITCODE
-
-Write-Host ""
-Print-Separator
-if ($exit_code -eq 0) {
-    Write-Host 'Test completado exitosamente' -ForegroundColor Green
-    Write-Host "Reporte guardado en: $report_subdir/$report_name" -ForegroundColor Green
-} else {
-    Write-Host "Test finalizado con errores (codigo: $exit_code)" -ForegroundColor Red
+if (-not $reportName.EndsWith(".html")) {
+    $reportName = "$reportName.html"
 }
 
-exit $exit_code
+Write-Host "✓ Reporte: $reportSubdir\$reportName" -ForegroundColor Green
+Print-Separator
+
+# -------------------- CONFIGURACIÓN DE VARIABLES DE ENTORNO - K6 --------------------
+
+Write-Host "Variables de entorno (presiona Enter para usar valores por defecto):" -ForegroundColor Yellow
+Write-Host ""
+
+# K6_WEB_DASHBOARD
+# Write-Host "  K6_WEB_DASHBOARD [" -NoNewline
+# Write-Host "true" -ForegroundColor Green -NoNewline
+# Write-Host "]: " -NoNewline
+# $webDashboard = Read-Host
+if ([string]::IsNullOrEmpty($webDashboard)) { $webDashboard = "true" }
+
+# K6_WEB_DASHBOARD_OPEN
+# Write-Host "  K6_WEB_DASHBOARD_OPEN [" -NoNewline
+# Write-Host "$webDashboard" -ForegroundColor Green -NoNewline
+# Write-Host "]: " -NoNewline
+# $webDashboardOpen = Read-Host
+if ([string]::IsNullOrEmpty($webDashboardOpen)) { $webDashboardOpen = $webDashboard }
+
+# BASE_URL
+Write-Host "  BASE_URL (opcional) [" -NoNewline
+Write-Host "-" -ForegroundColor Green -NoNewline
+Write-Host "]: " -NoNewline
+$baseUrl = Read-Host
+
+# VUs
+Write-Host "  VUs (virtual users, opcional) [" -NoNewline
+Write-Host "-" -ForegroundColor Green -NoNewline
+Write-Host "]: " -NoNewline
+$vus = Read-Host
+
+# DURATION
+Write-Host "  DURATION (ej: 30s, 1m, opcional) [" -NoNewline
+Write-Host "-" -ForegroundColor Green -NoNewline
+Write-Host "]: " -NoNewline
+$duration = Read-Host
+
+Print-Separator
+
+$env:K6_WEB_DASHBOARD = $webDashboard
+$env:K6_WEB_DASHBOARD_OPEN = $webDashboardOpen
+$env:K6_WEB_DASHBOARD_EXPORT = Join-Path $reportSubdir $reportName
+if (-not [string]::IsNullOrEmpty($baseUrl)) {
+    $env:BASE_URL = $baseUrl
+}
+
+# -------------------- CONSTRUCCIÓN DEL COMANDO --------------------
+
+$cmdArgs = @("run")
+
+if (-not [string]::IsNullOrEmpty($vus)) {
+    $cmdArgs += "--vus"
+    $cmdArgs += $vus
+}
+
+if (-not [string]::IsNullOrEmpty($duration)) {
+    $cmdArgs += "--duration"
+    $cmdArgs += $duration
+}
+
+$cmdArgs += $selectedTest
+
+# Muestra un resumen de la configuración
+Write-Host "Resumen de ejecución:" -ForegroundColor Yellow
+Write-Host "  Test:        " -NoNewline
+Write-Host "$selectedTest" -ForegroundColor Green
+Write-Host "  Reporte:     " -NoNewline
+Write-Host "$reportSubdir\$reportName" -ForegroundColor Green
+Write-Host "  BASE_URL:    " -NoNewline
+Write-Host "$baseUrl" -ForegroundColor Green
+Write-Host "  Dashboard:   " -NoNewline
+Write-Host "$webDashboard" -ForegroundColor Green
+Write-Host "  Auto-open:   " -NoNewline
+Write-Host "$webDashboardOpen" -ForegroundColor Green
+if (-not [string]::IsNullOrEmpty($vus)) {
+    Write-Host "  VUs:         " -NoNewline
+    Write-Host "$vus" -ForegroundColor Green
+}
+if (-not [string]::IsNullOrEmpty($duration)) {
+    Write-Host "  Duration:    " -NoNewline
+    Write-Host "$duration" -ForegroundColor Green
+}
+Print-Separator
+
+# -------------------- EJECUCIÓN DEL TEST --------------------
+
+Write-Host "¿Ejecutar test? (s/N) [" -ForegroundColor Yellow -NoNewline
+Write-Host "s" -ForegroundColor Green -NoNewline
+Write-Host "]: " -ForegroundColor Yellow -NoNewline
+$confirm = Read-Host
+if ([string]::IsNullOrEmpty($confirm)) { $confirm = "s" }
+
+if ($confirm -notmatch '^[sS]$') {
+    Write-Host "Ejecución cancelada" -ForegroundColor Red
+    exit 0
+}
+
+# Ejecuta el comando
+Write-Host ""
+Write-Host "Ejecutando: k6 $($cmdArgs -join ' ')" -ForegroundColor Green
+Print-Separator
+Write-Host ""
+
+& k6 $cmdArgs
+
+$exitCode = $LASTEXITCODE
+
+Write-Host ""
+Print-Separator
+if ($exitCode -eq 0) {
+    Write-Host "✓ Test completado exitosamente" -ForegroundColor Green
+    Write-Host "✓ Reporte guardado en: $reportSubdir\$reportName" -ForegroundColor Green
+} else {
+    Write-Host "✗ Test finalizado con errores (código: $exitCode)" -ForegroundColor Red
+}
+
+exit $exitCode
