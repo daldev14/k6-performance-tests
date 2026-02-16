@@ -6,6 +6,7 @@
 
 TEST_DIR="./k6-tests"
 REPORTS_DIR="./reports"
+TEST_EXTENSION="*.test.js"
 
 # Colors for output
 # Define códigos de colores para imprimir mensajes en la terminal
@@ -51,7 +52,7 @@ while IFS= read -r file; do
     tests+=("$file")
     echo -e "  ${GREEN}[$i]${NC} $relative_path"
     ((i++))
-done < <(find "$TEST_DIR" -name "*.test.js" -type f | sort)
+done < <(find "$TEST_DIR" -name $TEST_EXTENSION -type f | sort)
 
 if [ ${#tests[@]} -eq 0 ]; then
     echo -e "${RED}No se encontraron tests en $TEST_DIR${NC}"
@@ -122,9 +123,14 @@ read -r web_dashboard
 web_dashboard=${web_dashboard:-true}
 
 # K6_WEB_DASHBOARD_OPEN (define si el dashboard se abre automáticamente en el navegador al iniciar el test)
-echo -e -n "  K6_WEB_DASHBOARD_OPEN [${GREEN}true${NC}]: "
+echo -e -n "  K6_WEB_DASHBOARD_OPEN [${GREEN}$web_dashboard${NC}]: "
 read -r web_dashboard_open
-web_dashboard_open=${web_dashboard_open:-true}
+web_dashboard_open=${web_dashboard_open:-$web_dashboard}
+
+# Linger - Permite seguir ejecutando el proceso de la prueba una vez finalizada, útil si se quiere seguir utilizando K6_WEB_DASHBOARD
+echo -e -n "  LINGER - PERSISTIR (Seguir ejecutando el proceso despues de finalizar la prueba) [${GREEN}$web_dashboard${NC}]: "
+read -r linger
+linger=${linger:-$web_dashboard}
 
 # BASE_URL (opcional) sobrescribe la URL base definida en el test, solo si se proporciona un valor
 echo -e -n "  BASE_URL (opcional) [${GREEN}-${NC}]: "
@@ -147,7 +153,11 @@ export K6_WEB_DASHBOARD_EXPORT="$report_subdir/$report_name"
 export BASE_URL="$base_url"
 
 # Construye el comando agregando las opciones definidas
-cmd="k6 run -l"
+cmd="k6 run"
+
+if [ -n "$linger" ]; then
+    cmd="$cmd -l"
+fi
 
 if [ -n "$vus" ]; then
     cmd="$cmd --vus $vus"
@@ -166,6 +176,7 @@ echo -e "  Reporte:     ${GREEN}$report_subdir/$report_name${NC}"
 echo -e "  BASE_URL:    ${GREEN}$base_url${NC}"
 echo -e "  Dashboard:   ${GREEN}$web_dashboard${NC}"
 echo -e "  Auto-open:   ${GREEN}$web_dashboard_open${NC}"
+echo -e "  Linger:      ${GREEN}$linger${NC}"
 [ -n "$vus" ] && echo -e "  VUs:         ${GREEN}$vus${NC}"
 [ -n "$duration" ] && echo -e "  Duration:    ${GREEN}$duration${NC}"
 print_separator
