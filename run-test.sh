@@ -4,7 +4,7 @@
 # k6 Test Runner Script for Linux
 # =============================================================================
 
-TEST_DIR="./k6-tests"
+TEST_DIR="./src/k6-tests"
 REPORTS_DIR="./reports"
 TEST_EXTENSION="*.test.js"
 
