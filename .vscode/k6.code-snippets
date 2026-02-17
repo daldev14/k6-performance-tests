@@ -1,0 +1,222 @@
+{
+    "k6 Smoke": {
+        "prefix": "k6smoke",
+        "body": [
+            "/**",
+            "* ${2:Smoke Test}",
+            "* Objetivo: ${4:Verificar que el endpoint responde correctament bajo condiones minimas o normales de carga}",
+            "* Escenario: ${5:10 usuarios virtuales durante 30 segundos}",
+            "* Métricas clave: ${6:Tiempo de respuesta y tasa de error}",
+            "* Resultados esperados: ${7:Se espera que el endpoint responda con un código de estado 200 y tiempos de respuesta aceptables}",
+            "* Notas adicionales: ${8:(Cualquier información adicional relevante para la prueba)}",
+            "*/",
+            "",
+            "import http from 'k6/http';",
+            "import { check, sleep } from 'k6';",
+            "",
+            "export const options = {",
+            "  vus: 10,",
+            "  duration: '30s',",
+            "};",
+            "",
+            "export default function () {",
+            "  const response = http.get('${1:http://test.k6.io}');",
+            "  check(response, { 'status is 200': (r) => r.status === 200 });",
+            "  sleep(1);",
+            "}"
+        ],
+        "description": "Smoke test para verificar que el endpoint responde correctamente."
+    },
+    "k6 Load": {
+        "prefix": "k6load",
+        "body": [
+            "* ${2:Load Test}",
+            "* Objetivo: ${4:Verificar que el endpoint responde correctament bajo condiciones de carga moderada}",
+            "* Escenario: ${5:50 usuarios virtuales durante 5 minutos}",
+            "* Métricas clave: ${6:Tiempo de respuesta y tasa de error}",
+            "* Resultados esperados: ${7:Se espera que el endpoint responda con un código de estado 200 y tiempos de respuesta aceptables bajo carga}",
+            "* Notas adicionales: ${8:(Cualquier información adicional relevante para la prueba)}",
+            "*/",
+            "",
+            "import http from 'k6/http';",
+            "import { check, sleep } from 'k6';",
+            "",
+            "export const options = {",
+            "  stages: [",
+            "    { duration: '1m', target: 50 }, // Ramp-up to 50 users over 1 minute",
+            "    { duration: '3m', target: 50 }, // Stay at 50 users for 3 minutes",
+            "    { duration: '1m', target: 0 }, // Ramp-down to 0 users over 1 minute",
+            "  ],",
+            "};",
+            "",
+            "export default function () {",
+            "  const response = http.get('${1:http://test.k6.io}');",
+            "  check(response, { 'status is 200': (r) => r.status === 200 });",
+            "  sleep(1);",
+            "}"
+        ],
+        "description": "Load test para simular una carga gradual de usuarios y medir el rendimiento del endpoint."
+    },
+    "k6 Stress": {
+        "prefix": "k6stress",
+        "body": [
+            "* ${2:Stress Test}",
+            "* Objetivo: ${4:Verificar que el endpoint responde correctament bajo condiciones de carga máxima}",
+            "* Escenario: ${5:100 usuarios virtuales durante 5 minutos}",
+            "* Métricas clave: ${6:Tiempo de respuesta y tasa de error}",
+            "* Resultados esperados: ${7:Se espera que el endpoint responda con un código de estado 200 y tiempos de respuesta aceptables bajo carga máxima}",
+            "* Notas adicionales: ${8:(Cualquier información adicional relevante para la prueba)}",
+            "*/",
+            "",
+            "import http from 'k6/http';",
+            "import { check, sleep } from 'k6';",
+            "",
+            "export const options = {",
+            "  stages: [",
+            "    { duration: '1m', target: 100 }, // Ramp-up to 100 users over 1 minute",
+            "    { duration: '5m', target: 100 }, // Stay at 100 users for 5 minutes",
+            "    { duration: '1m', target: 0 }, // Ramp-down to 0 users over 1 minute",
+            "  ],",
+            "};",
+            "",
+            "export default function () {",
+            "  const response = http.get('${1:http://test.k6.io}');",
+            "  check(response, { 'status is 200': (r) => r.status === 200 });",
+            "  sleep(1);",
+            "}"
+        ],
+        "description": "Stress test para simular una carga máxima de usuarios y evaluar cómo el sistema maneja la presión."
+    },
+    "k6 Spike": {
+        "prefix": "k6spike",
+        "body": [
+            "* ${2:Spike Test}",
+            "* Objetivo: ${4:Verificar que el endpoint responde correctament bajo un aumento repentino de usuarios}",
+            "* Escenario: ${5:10 usuarios virtuales durante 1 minuto, luego un pico a 100 usuarios durante 1 minuto, seguido de una caída a 0 usuarios durante 1 minuto}",
+            "* Métricas clave: ${6:Tiempo de respuesta y tasa de error}",
+            "* Resultados esperados: ${7:Se espera que el endpoint responda con un código de estado 200 y tiempos de respuesta aceptables durante el pico de usuarios}",
+            "* Notas adicionales: ${8:(Cualquier información adicional relevante para la prueba)}",
+            "*/",
+            "",
+            "import http from 'k6/http';",
+            "import { check, sleep } from 'k6';",
+            "",
+            "export const options = {",
+            "  stages: [",
+            "    { duration: '1m', target: 10 }, // Ramp-up to 10 users over 1 minute",
+            "    { duration: '1m', target: 100 }, // Spike to 100 users for 1 minute",
+            "    { duration: '3m', target: 100 }, // Stay at 100 users for 3 minutes",
+            "    { duration: '1m', target: 0 }, // Ramp-down to 0 users over 1 minute",
+            "  ],",
+            "};",
+            "",
+            "export default function () {",
+            "  const response = http.get('${1:http://test.k6.io}');",
+            "  check(response, { 'status is 200': (r) => r.status === 200 });",
+            "  sleep(1);",
+            "}"
+        ],
+        "description": "Spike test para simular un aumento repentino de usuarios y evaluar cómo el sistema maneja la carga inesperada."
+    },
+    "def": {
+        "prefix": "def",
+        "body": [
+            "/**",
+            "* ${1:(Nombre de la prueba)}",
+            "* Objetivo: ${3:(Qué se espera lograr con esta prueba)}",
+            "* Escenario: ${4:(Descripción del escenario de prueba, incluyendo el número de usuarios virtuales, la duración de la prueba, etc.)}",
+            "* Métricas clave: ${5:(Qué métricas se van a monitorear, como el tiempo de respuesta, la tasa de error, etc.)}",
+            "* Resultados esperados: ${6:(Qué resultados se consideran aceptables para esta prueba)}",
+            "* Notas adicionales: ${7:(Cualquier información adicional relevante para la prueba)}",
+            "*/",
+            "",
+            "import http from 'k6/http';",
+            "import { check, sleep } from 'k6';",
+            "",
+            "export default function() {",
+            "  $0",
+            "};"
+        ],
+        "description": "Plantilla básica para un script de k6."
+    },
+    "opt": {
+        "prefix": "opt",
+        "body": [
+            "export let options = {",
+            "  $0",
+            "};"
+        ],
+        "description": "Plantilla para definir las opciones de configuración de un script de k6."
+    },
+    "che": {
+        "prefix": "che",
+        "body": [
+            "check(response, {",
+            "  'is status code 200': (r) => r.status === 200,",
+            "});"
+        ],
+        "description": "Plantilla para verificar el código de estado de una respuesta HTTP."
+    },
+    "slee": {
+        "prefix": "slee",
+        "body": [
+            "sleep(${1:10});"
+        ],
+        "description": "Plantilla para agregar una pausa en la ejecución del script de k6."
+    },
+    "get": {
+        "prefix": "get",
+        "body": [
+            "const ${1:response} = http.get('${2:http://test.k6.io}');"
+        ],
+        "description": "Plantilla para realizar una solicitud GET a un endpoint específico."
+    },
+    "post": {
+        "prefix": "post",
+        "body": [
+            "const ${3:response} = http.post('${1:http://test.k6.io}', ${2:headers});"
+        ],
+        "description": "Plantilla para realizar una solicitud POST a un endpoint específico con un cuerpo de datos."
+    },
+    "put": {
+        "prefix": "put",
+        "body": [
+            "const ${3:response} = http.put('${1:http://test.k6.io}', {",
+            "  ${2:headers}",
+            ");"
+        ],
+        "description": "Plantilla para realizar una solicitud PUT a un endpoint específico con un cuerpo de datos."
+    },
+    "delete": {
+        "prefix": "del",
+        "body": [
+            "const ${3:response} = http.del('${1:http://test.k6.io}', {",
+            "  ${2:headers}",
+            ");"
+        ],
+        "description": "Plantilla para realizar una solicitud DELETE a un endpoint específico con un cuerpo de datos."
+    },
+    "group": {
+        "prefix": "gro",
+        "body": [
+            "group('${1:groupName}', function() {",
+            "  $0",
+            "});"
+        ],
+        "description": "Plantilla para agrupar varias solicitudes o acciones dentro de un bloque lógico en un script de k6."
+    },
+    "notes": {
+        "prefix": "notes",
+        "body": [
+            "/**",
+            "* ${1:(Nombre de la prueba)}",
+            "* Objetivo: ${3:(Qué se espera lograr con esta prueba)}",
+            "* Escenario: ${4:(Descripción del escenario de prueba, incluyendo el número de usuarios virtuales, la duración de la prueba, etc.)}",
+            "* Métricas clave: ${5:(Qué métricas se van a monitorear, como el tiempo de respuesta, la tasa de error, etc.)}",
+            "* Resultados esperados: ${6:(Qué resultados se consideran aceptables para esta prueba)}",
+            "* Notas adicionales: ${7:(Cualquier información adicional relevante para la prueba)}",
+            "*/",
+            ""
+        ]
+    }
+}
