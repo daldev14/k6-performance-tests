@@ -2,84 +2,88 @@
 
 Proyecto de pruebas de rendimiento utilizando [k6](https://k6.io/).
 
-## Estructura del Proyecto
+## 🛠 Instalación
 
+[Guía de instalación K6 Oficial](https://grafana.com/docs/k6/latest/set-up/install-k6/)
+
+### Windows
+
+Para realizar la instalación de **K6 en windows** tenemos varias formas:
+
+#### Windows Package Manager (Winget) - RECOMENDADO
+
+Asegurece de tener instalado winget para ello mediante el CMD ejecutar el siguiente comando. En caso de no tenerlo instalado puede descargarlo desde el [repositorio oficial](https://github.com/microsoft/winget-cli/releases).
+
+```bash
+winget
 ```
-k6-performance-tests/
-├── k6-tests/            # Scripts de pruebas
-│   ├── basic-test.js    # Prueba básica con métricas personalizadas
-│   ├── load-test.js     # Prueba de carga con escenarios
-│   └── stress-test.js   # Prueba de estrés para encontrar límites
-├── scenarios/           # Configuraciones de escenarios reutilizables
-├── lib/                 # Funciones auxiliares y utilidades
-│   └── helpers.js       # Funciones de ayuda comunes
-├── reports/             # Reportes generados
-├── run-test.bat
-├── run-test.ps1
-└── run-test.sh
+
+Eejecutar el siguiente comando para instalar K6.
+
+```cmd
+winget install k6 --source winget
 ```
 
-## Requisitos
+_El proceso de descarga e instalación es automático._
 
-- k6 instalado ([Guía de instalación](https://k6.io/docs/get-started/installation/))
+#### Binario .exe
+
+Entre al siguiente [enlace](https://grafana.com/docs/k6/latest/set-up/install-k6/#windows) para descargar el instalador.
+
+### Linux
+
+Para instalar k6 en Linux ejecute los siguientes comandos:
+
+```bash
+sudo gpg -k
+```
+
+```bash
+sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+```
+
+```bash
+echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+```
+
+```bash
+sudo apt-get update && sudo apt-get install k6
+```
 
 ## Uso
 
-### Ejecutar prueba básica
+### Ejecutar prueba powershell (script)
+
 ```bash
-k6 run scripts/basic-test.js
+./run-test.ps1
 ```
 
-### Ejecutar con URL personalizada
+### Ejecutar prueba cmd (script)
+
 ```bash
-k6 run -e BASE_URL=https://tu-api.com scripts/basic-test.js
+./run-test.bat
 ```
 
-### Ejecutar prueba de carga
+### Ejecutar prueba bash (script)
+
 ```bash
-k6 run scripts/load-test.js
+./run-test.sh
 ```
 
-### Ejecutar prueba de estrés
+### Ejecutar prueba (comando k6)
+
 ```bash
-k6 run scripts/stress-test.js
+k6 run src/k6-tests/example.test.js
 ```
 
 ### Generar reporte HTML
+
 ```bash
-k6 run --out json=reports/results.json scripts/basic-test.js
+k6 run --out json=reports/results.json src/k6-tests/example.test.js
 ```
 
 ### Ejecutar con múltiples VUs rápidamente
-```bash
-k6 run --vus 10 --duration 30s scripts/basic-test.js
-```
-
-## Tipos de Pruebas
-
-| Tipo | Script | Descripción |
-|------|--------|-------------|
-| Smoke | basic-test.js | Verificación rápida de funcionalidad |
-| Load | load-test.js | Carga sostenida típica |
-| Stress | stress-test.js | Encuentra puntos de quiebre |
-
-## Métricas Principales
-
-- `http_req_duration` - Duración de las peticiones HTTP
-- `http_req_failed` - Tasa de fallos
-- `errors` - Métrica personalizada de errores
-- `response_time` - Tendencia de tiempos de respuesta
-
-## Thresholds
-
-Los umbrales están configurados en cada script. Ejemplo:
-- 95% de peticiones < 500ms
-- Tasa de error < 10%
-
-## Integración CI/CD
 
 ```bash
-# Ejemplo para GitHub Actions o similar
-k6 run --out json=reports/results.json scripts/load-test.js
-# El script retorna código de salida no-cero si fallan los thresholds
+k6 run --vus 10 --duration 30s src/k6-tests/example.test.js
 ```
