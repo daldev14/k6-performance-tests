@@ -9,18 +9,18 @@ export const options = {
       executor: 'ramping-vus',
       startVUs: 0,
       stages: [
-        { duration: '2m', target: 50 },   // Aumento gradual de carga (Ramp up)
-        { duration: '5m', target: 50 },   // Carga sostenida (Sustained load)
-        { duration: '2m', target: 100 },  // Carga máxima (Peak load)
-        { duration: '5m', target: 100 },  // Pico sostenido (Sustained peak)
-        { duration: '2m', target: 0 },    // Disminución gradual de carga (Ramp down)
+        { duration: '2m', target: 50 }, // Aumento gradual de carga (Ramp up)
+        { duration: '5m', target: 50 }, // Carga sostenida (Sustained load)
+        { duration: '2m', target: 100 }, // Carga máxima (Peak load)
+        { duration: '5m', target: 100 }, // Pico sostenido (Sustained peak)
+        { duration: '2m', target: 0 }, // Disminución gradual de carga (Ramp down)
       ],
       gracefulRampDown: '30s',
     },
   },
   thresholds: {
-    http_req_failed: ['rate<0.01'],        // Menos del 1% de las solicitudes deben fallar
-    http_req_duration: ['p(99)<1500'],     // 99% de las solicitudes deben responder en menos de 1500ms
+    http_req_failed: ['rate<0.01'], // Menos del 1% de las solicitudes deben fallar
+    http_req_duration: ['p(99)<1500'], // 99% de las solicitudes deben responder en menos de 1500ms
   },
 };
 
