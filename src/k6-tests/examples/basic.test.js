@@ -1,3 +1,12 @@
+/**
+* Test de rendimiento básico utilizando k6
+* Objetivo: Evaluar el rendimiento de la API bajo una carga moderada de usuarios virtuales.
+* Escenario: Simular 10 usuarios virtuales que realizan solicitudes GET a la API durante un período de tiempo específico.
+* Métricas clave: Tiempo de respuesta, tasa de errores, rendimiento bajo carga.
+* Resultados esperados: La mayoría de las solicitudes deben responder en menos de 500ms, y la tasa de errores debe ser inferior al 10%.
+* Notas adicionales: Este test se puede ejecutar utilizando el comando `k6 run basic.test.js` y se pueden ajustar las configuraciones de carga y las métricas según sea necesario para adaptarse a diferentes escenarios de prueba.
+*/
+
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Rate, Trend } from 'k6/metrics';

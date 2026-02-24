@@ -5,14 +5,14 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { authHeaders, randomSleep } from '../lib/helpers.js';
-import { API_BASE_URL, ENDPOINTS, TEST_USER } from '../lib/const.js';
+import { BASE_URL, ENDPOINTS, TEST_USER } from '../lib/const.js';
 
 /**
  * Ejecuta un flujo de login y retorna el token de autenticación
  * @returns {string|null} Token JWT si el login es exitoso, null en caso contrario
  */
 export function loginScenario() {
-  const loginUrl = `${API_BASE_URL}${ENDPOINTS.LOGIN}`;
+  const loginUrl = `${BASE_URL}${ENDPOINTS.LOGIN}`;
 
   const payload = JSON.stringify({
     email: TEST_USER.email,
@@ -45,7 +45,7 @@ export function loginScenario() {
  * @returns {boolean} True si logout fue exitoso
  */
 export function logoutScenario(token) {
-  const logoutUrl = `${API_BASE_URL}${ENDPOINTS.LOGOUT}`;
+  const logoutUrl = `${BASE_URL}${ENDPOINTS.LOGOUT}`;
 
   const response = http.post(logoutUrl, null, {
     headers: authHeaders(token),

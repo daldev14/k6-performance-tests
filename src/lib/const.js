@@ -3,12 +3,12 @@
  */
 
 // URLs base según el entorno
-export const BASE_URL = __ENV.BASE_URL || 'https://httpbin.org';
+export const BASE_URL = __ENV.BASE_URL || 'https://test-api.k6.io';
 export const API_BASE_URL = __ENV.API_BASE_URL || `${BASE_URL}/api`;
 
 // Endpoints comunes
 export const ENDPOINTS = {
-  LOGIN: '/auth/login',
+  LOGIN: '/login',
   LOGOUT: '/auth/logout',
   USERS: '/users',
   SEARCH: '/search',
@@ -36,8 +36,8 @@ export const TIMEOUTS = {
 
 // Datos de prueba
 export const TEST_USER = {
-  email: 'test@example.com',
-  password: 'Password123!',
+  email: 'default',
+  password: '12345678',
 };
 
 // Códigos de error comunes
